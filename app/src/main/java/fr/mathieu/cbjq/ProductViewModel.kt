@@ -45,7 +45,6 @@ class ProductViewModel(application: Application) : ViewModel() {
     }
 
     fun updateItem(product: Product) {
-        Log.d("hello", product.toString())
         viewModelScope.launch {
             productDao.update(product)
         }

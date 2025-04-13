@@ -57,8 +57,17 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.Popup
 import fr.mathieu.cbjq.ui.theme.CbjqTheme
 import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.Period
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+
 
 class MainActivity : ComponentActivity() {
 
@@ -94,8 +103,7 @@ class MainActivity : ComponentActivity() {
 
                     },
                     floatingActionButton = {
-                        FAB(
-                            viewModel, onClick = { openNewProduct.value = true }
+                        FAB(onClick = { openNewProduct.value = true }
                         )
                     },
                     floatingActionButtonPosition = FabPosition.End)
@@ -113,6 +121,14 @@ fun ProductRow(
     onDelete: () -> Unit,
     onItemClicked: () -> Unit
 ) {
+    val limitDateLocalDate: LocalDate = limitDate!!.toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
+    val openDateLocalDate: LocalDate? = openDate?.toInstant()?.atZone(ZoneId.systemDefault())?.toLocalDate()
+
+    val datePattern = DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", Locale.FRANCE)
+
+    val dateNow: LocalDate = LocalDate.now()
+    val daysLeftBeforeDLC: Duration = ChronoUnit.DAYS.between(dateNow, limitDateLocalDate).days
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -140,14 +156,13 @@ fun ProductRow(
 
                 Text(
                     text = if (openDate == null) "Non ouvert"
-                    else "Ouvert le ${SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(openDate)}",
+                    else "Ouvert le ${openDateLocalDate?.format(datePattern)}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.Gray
                 )
 
-
                 Text(
-                    text = "DLC : ${SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(limitDate!!)}",
+                    text = "DLC : ${limitDateLocalDate.format(datePattern)} | ${daysLeftBeforeDLC.inWholeDays} jour(s) restant(s)",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.primary
@@ -186,7 +201,7 @@ fun ProductList(viewModel: ProductViewModel, modifier: Modifier) {
 }
 
 @Composable
-fun FAB(viewModel: ProductViewModel, onClick: () -> Unit) {
+fun FAB(onClick: () -> Unit) {
     FloatingActionButton(onClick = onClick) {
         Icon(Icons.Filled.Add, "Floating action button.")
     }
