@@ -1,7 +1,6 @@
 package fr.mathieu.cbjq
 
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -23,6 +22,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -44,6 +45,7 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -51,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -58,11 +61,9 @@ import androidx.compose.ui.window.Popup
 import fr.mathieu.cbjq.ui.theme.CbjqTheme
 import java.text.SimpleDateFormat
 import java.time.LocalDate
-import java.time.Period
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.time.Duration
@@ -184,19 +185,48 @@ fun ProductRow(
 @Composable
 fun ProductList(viewModel: ProductViewModel, modifier: Modifier) {
     val products by viewModel.products.collectAsState()
-    val productR = remember { mutableStateOf<Product?>(null) }
-    val openProduct = remember { mutableStateOf(false) }
+
+    // contient les données du produit qui est cliqué ou en attente de confirmation pour suppression
+    val targetProduct = remember { mutableStateOf<Product?>(null) }
+    val targetProductIndex = remember { mutableStateOf<Int?>(null) }
+
+    val openProductDialog = remember { mutableStateOf(false) }
+    val deleteAlertDialogOpen = remember { mutableStateOf(false) }
+
     LazyColumn(modifier = modifier) {
         itemsIndexed(products.items) { index, product ->
-            ProductRow(product.name, product.openDate, product.limitDate, onDelete = { viewModel.deleteItem(index) }, onItemClicked = {
-                openProduct.value = true
-                productR.value = product
+            ProductRow(
+                product.name,
+                product.openDate,
+                product.limitDate,
+                onDelete = {
+                    deleteAlertDialogOpen.value = true
+                    targetProduct.value = product
+                    targetProductIndex.value = index
+            }, onItemClicked = {
+                openProductDialog.value = true
+                targetProduct.value = product
             })
         }
     }
 
-    if (openProduct.value) {
-        ProductDialog(viewModel, product = productR.value, onDismissRequest = { openProduct.value = false }, onAddBtnClicked = { openProduct.value = false })
+    if (openProductDialog.value) {
+        ProductDialog(viewModel, product = targetProduct.value, onDismissRequest = { openProductDialog.value = false }, onAddBtnClicked = { openProductDialog.value = false })
+    }
+
+    if (deleteAlertDialogOpen.value) {
+        ConfirmationAlertDialog(
+            onConfirmation = {
+                deleteAlertDialogOpen.value = false
+                viewModel.deleteItem(targetProductIndex.value!!)
+            },
+            onDismissRequest = {
+                deleteAlertDialogOpen.value = false
+            },
+            dialogText = "Voulez-vous vraiment supprimer l'aliment ${targetProduct.value!!.name} ?",
+            dialogTitle = "Confirmation",
+            icon = Icons.Default.Info
+        )
     }
 }
 
@@ -272,7 +302,6 @@ fun ProductDialog(
                             if (limitDate.value != null) {
                                 if (product != null) {
                                     viewModel.updateItem(Product(id = product.id, name = name.value, openDate = openDate.value?.let { Date(it) }, limitDate = Date(limitDate.value!!)))
-                                    Log.i("CBJQ", "updated!")
                                 } else {
                                     viewModel.addItem(
                                         Product(
@@ -367,6 +396,32 @@ fun DatePickerDocked(initialSelectedDateMillis: Long?, onDateSelected: (selected
             }
         }
     }
+}
+
+@Composable
+fun ConfirmationAlertDialog(
+    onDismissRequest: () -> Unit,
+    onConfirmation: () -> Unit,
+    dialogTitle: String,
+    dialogText: String,
+    icon: ImageVector,
+) {
+    AlertDialog(
+        icon = { Icon(icon, contentDescription = "Example Icon") },
+        title = { Text(text = dialogTitle) },
+        text = { Text(text = dialogText) },
+        onDismissRequest = { onDismissRequest() },
+        confirmButton = {
+            TextButton(onClick = { onConfirmation() }) {
+                Text("Confimer")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { onDismissRequest() }) {
+                Text("Annuler")
+            }
+        }
+    )
 }
 
 fun convertMillisToDate(millis: Long): String {
