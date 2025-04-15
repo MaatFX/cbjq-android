@@ -10,11 +10,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,7 +47,6 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -85,7 +86,7 @@ class MainActivity : ComponentActivity() {
                         TopAppBar(
                             colors = topAppBarColors(
                                 containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                titleContentColor = MaterialTheme.colorScheme.primary,
+                                titleContentColor = Color.White,
                             ),
                             title = {
                                 Text("C'est ouvert depuis quand ?")
@@ -104,8 +105,7 @@ class MainActivity : ComponentActivity() {
 
                     },
                     floatingActionButton = {
-                        FAB(onClick = { openNewProduct.value = true }
-                        )
+                        FAB(onClick = { openNewProduct.value = true } )
                     },
                     floatingActionButtonPosition = FabPosition.End)
 
@@ -116,58 +116,69 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun ProductRow(
-    name: String,
-    openDate: Date?,
-    limitDate: Date?,
+    product: Product,
     onDelete: () -> Unit,
     onItemClicked: () -> Unit
 ) {
-    val limitDateLocalDate: LocalDate = limitDate!!.toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
-    val openDateLocalDate: LocalDate? = openDate?.toInstant()?.atZone(ZoneId.systemDefault())?.toLocalDate()
+    val limitDateLocalDate: LocalDate = product.limitDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
+    val openDateLocalDate: LocalDate? = product.openDate?.toInstant()?.atZone(ZoneId.systemDefault())?.toLocalDate()
 
     val datePattern = DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", Locale.FRANCE)
 
-    val dateNow: LocalDate = LocalDate.now()
-    val daysLeftBeforeDLC: Duration = ChronoUnit.DAYS.between(dateNow, limitDateLocalDate).days
+    val leftDaysBeforeDLC = getLeftDaysBeforeDLC(product)
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(8.dp)
+            .padding(12.dp)
+            .height(96.dp)
             .clickable(onClick = onItemClicked),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(0.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
             modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .fillMaxHeight(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
+
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(getColorsForDLC(product))
+            )
+
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f).padding(start = 16.dp)
             ) {
 
                 Text(
-                    text = name,
+                    text = product.name,
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold)
+                    fontWeight = FontWeight.Bold
+                )
 
 
                 Text(
-                    text = if (openDate == null) "Non ouvert"
+                    text = if (product.openDate == null) "Non ouvert"
                     else "Ouvert le ${openDateLocalDate?.format(datePattern)}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.Gray
                 )
 
                 Text(
-                    text = "DLC : ${limitDateLocalDate.format(datePattern)} | ${daysLeftBeforeDLC.inWholeDays} jour(s) restant(s)",
+                    text = "DLC : ${limitDateLocalDate.format(datePattern)} | $leftDaysBeforeDLC jour(s) restant(s)",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.primary
+                    color = Color.Black
                 )
+
+
 
             }
 
@@ -196,9 +207,7 @@ fun ProductList(viewModel: ProductViewModel, modifier: Modifier) {
     LazyColumn(modifier = modifier) {
         itemsIndexed(products.items) { index, product ->
             ProductRow(
-                product.name,
-                product.openDate,
-                product.limitDate,
+                product,
                 onDelete = {
                     deleteAlertDialogOpen.value = true
                     targetProduct.value = product
@@ -275,11 +284,11 @@ fun ProductDialog(
                     singleLine = true
                 )
 
-                    DatePickerDocked(
-                        initialSelectedDateMillis = if (product != null) product.openDate?.time else null,
-                        onDateSelected = { if (it != null) openDate.value = it },
-                        name = "Date d'ouverture"
-                    )
+                DatePickerDocked(
+                    initialSelectedDateMillis = if (product != null) product.openDate?.time else null,
+                    onDateSelected = { if (it != null) openDate.value = it },
+                    name = "Date d'ouverture"
+                )
 
 
                 DatePickerDocked(
@@ -424,9 +433,31 @@ fun ConfirmationAlertDialog(
     )
 }
 
+fun getColorsForDLC(product: Product): Color {
+
+    val dateNow: LocalDate = LocalDate.now()
+    val productDLC: LocalDate = product.limitDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
+    val daysLeftBeforeDLC  = ChronoUnit.DAYS.between(dateNow, productDLC)
+
+    return when {
+        daysLeftBeforeDLC <= 2 -> Color.hsv(0F, 0.85F, 0.90F) // rouge
+        daysLeftBeforeDLC in 3..7 -> Color.hsv(28F, 0.85F, 0.90F) // orange
+        else -> Color.hsv(145F, 0.85F, 0.90F) // vert
+    }
+}
+
+fun getLeftDaysBeforeDLC(product: Product): Long {
+
+    val dateNow: LocalDate = LocalDate.now()
+    val limitDateLocalDate: LocalDate = product.limitDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
+
+    return ChronoUnit.DAYS.between(dateNow, limitDateLocalDate).days.inWholeDays
+}
+
 fun convertMillisToDate(millis: Long): String {
     val formatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
     return formatter.format(Date(millis))
 }
+
 
 

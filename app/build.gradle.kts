@@ -5,6 +5,7 @@ plugins {
     id("org.jetbrains.kotlin.android") version "2.0.21"
     id("com.google.devtools.ksp")
     alias(libs.plugins.compose.compiler)
+    kotlin("plugin.serialization") version "1.4.0"
 
 }
 
@@ -58,7 +59,7 @@ dependencies {
     // room
     implementation(libs.androidx.room.runtime)
     ksp(libs.androidx.room.compiler)
-
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.0.0")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
